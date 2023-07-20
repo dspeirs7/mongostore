@@ -11,6 +11,7 @@ import (
 	"encoding/gob"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gorilla/sessions"
@@ -33,21 +34,22 @@ func TestMongoStore(t *testing.T) {
 	var session *sessions.Session
 	var flashes []interface{}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// Copyright 2012 The Gorilla Authors. All rights reserved.
 	// Use of this source code is governed by a BSD-style
 	// license that can be found in the LICENSE file.
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Round 1 ----------------------------------------------------------------
-	dbsess, err := mongo.Connect(ctx, options.Client().ApplyURI("localhost"))
+	mongoUri := os.Getenv("MONGODB_URI")
+	db, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUri))
 	if err != nil {
 		panic(err)
 	}
-	defer dbsess.Disconnect(ctx)
+	defer db.Disconnect(ctx)
 
-	store := NewMongoStore(dbsess.Database("test").Collection("test_session"), 3600, true,
+	store := NewMongoStore(db.Database("test").Collection("test_session"), 3600, false,
 		[]byte("secret-key"))
 
 	req, _ = http.NewRequest("GET", "http://localhost:8080/", nil)
@@ -70,6 +72,7 @@ func TestMongoStore(t *testing.T) {
 	if err = sessions.Save(req, rsp); err != nil {
 		t.Fatalf("Error saving session: %v", err)
 	}
+
 	hdr = rsp.Header()
 	cookies, ok = hdr["Set-Cookie"]
 	if !ok || len(cookies) != 1 {

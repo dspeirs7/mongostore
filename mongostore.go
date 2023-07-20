@@ -7,6 +7,7 @@ package mongostore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -19,7 +20,7 @@ import (
 )
 
 var (
-	ErrInvalidId = errors.New("mgostore: invalid session id")
+	ErrInvalidId = errors.New("mongostore: invalid session id")
 )
 
 // Session object store in MongoDB
@@ -62,7 +63,7 @@ func NewMongoStore(c *mongo.Collection, maxAge int, ensureTTL bool,
 		expireAfterSeconds := int32((time.Duration(maxAge) * time.Second).Seconds())
 
 		indexModel := mongo.IndexModel{
-			Keys: bson.D{{Key: "modified", Value: 1}},
+			Keys: bson.D{{Key: "modified", Value: -1}},
 			Options: &options.IndexOptions{
 				Background:         &background,
 				Sparse:             &sparse,
@@ -205,6 +206,8 @@ func (m *MongoStore) upsert(session *sessions.Session, reqCtx context.Context) e
 		return err
 	}
 
+	fmt.Println("saving")
+
 	s := Session{
 		Id:       objectId,
 		Data:     encoded,
@@ -212,8 +215,9 @@ func (m *MongoStore) upsert(session *sessions.Session, reqCtx context.Context) e
 	}
 
 	filter := bson.D{{Key: "_id", Value: objectId}}
+	opts := options.Replace().SetUpsert(true)
 
-	_, err = m.coll.ReplaceOne(ctx, filter, s)
+	_, err = m.coll.ReplaceOne(ctx, filter, s, opts)
 	if err != nil {
 		return err
 	}
