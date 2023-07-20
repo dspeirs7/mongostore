@@ -7,13 +7,15 @@
 package mongostore
 
 import (
+	"context"
 	"encoding/gob"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/globalsign/mgo"
 	"github.com/gorilla/sessions"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type FlashMessage struct {
@@ -31,18 +33,21 @@ func TestMongoStore(t *testing.T) {
 	var session *sessions.Session
 	var flashes []interface{}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Copyright 2012 The Gorilla Authors. All rights reserved.
 	// Use of this source code is governed by a BSD-style
 	// license that can be found in the LICENSE file.
 
 	// Round 1 ----------------------------------------------------------------
-	dbsess, err := mgo.Dial("localhost")
+	dbsess, err := mongo.Connect(ctx, options.Client().ApplyURI("localhost"))
 	if err != nil {
 		panic(err)
 	}
-	defer dbsess.Close()
+	defer dbsess.Disconnect(ctx)
 
-	store := NewMongoStore(dbsess.DB("test").C("test_session"), 3600, true,
+	store := NewMongoStore(dbsess.Database("test").Collection("test_session"), 3600, true,
 		[]byte("secret-key"))
 
 	req, _ = http.NewRequest("GET", "http://localhost:8080/", nil)
